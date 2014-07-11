@@ -1,0 +1,75 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:opencv="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" >
+
+    <LinearLayout
+        android:id="@+id/Barlayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" >
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="vertical" >
+
+            <TextView
+                android:id="@+id/FeaturesView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_margin="5dp"
+                android:text="Features: 0"
+                android:textColor="#0066CC"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/ROCView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_margin="5dp"
+                android:text="ROC: 0"
+                android:textColor="#0066CC"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/wiperStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_margin="5dp"
+                android:text="Wipers: Off"
+                android:textColor="#0066CC"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+        <RelativeLayout
+            android:id="@+id/RelativeLayout1"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#AA0000"
+            android:orientation="vertical" >
+
+            <org.opencv.android.NativeCameraView
+                android:id="@+id/native_camera_surface_view"
+                android:layout_width="fill_parent"
+                android:layout_height="fill_parent"
+                android:layout_alignParentLeft="true"
+                android:layout_alignParentTop="true"
+                android:visibility="visible"
+                opencv:camera_id="any"
+                opencv:show_fps="true" />
+
+            <org.opencv.android.JavaCameraView
+                android:id="@+id/java_camera_surface_view"
+                android:layout_width="fill_parent"
+                android:layout_height="fill_parent"
+                android:visibility="visible"
+                opencv:camera_id="any"
+                opencv:show_fps="true" />
+
+        </RelativeLayout>
+
+    </LinearLayout>
+
+</FrameLayout>

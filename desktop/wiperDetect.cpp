@@ -51,12 +51,12 @@ double wiperAngle(vector<Vec2f>& lines, double angleThreshold)
 void edgeThin(const Mat& src, Mat& result, int niter, int lowerThreshold)
 {
   int i;
-  Mat temp = src;
+  result = src;
   for(i=0;i<niter;i++)
   {
     // Blur and suppress
-    blur(temp,temp,Size(5,5));
-    inRange(temp,Scalar(lowerThreshold),Scalar(255),temp);
+    blur(result,result,Size(5,5));
+    inRange(result,Scalar(lowerThreshold),Scalar(255),result);
   }
 }
 
