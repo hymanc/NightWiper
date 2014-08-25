@@ -6,6 +6,10 @@ import java.util.Date;
 
 import android.util.Log;
 
+/**
+ * @author Cody Hyman, UMTRI
+ *
+ */
 public class CommunicationThread extends Thread
 {
 	private static final String TAG = "CommunicationThread";
@@ -13,6 +17,10 @@ public class CommunicationThread extends Thread
 	
 	private boolean running = false;
 	
+	/**
+	 * Constructor for communication thread
+	 * @param server Bluetooth SPP Server to use for communication with data receiver
+	 */
 	public CommunicationThread(BluetoothSPPServer server)
 	{
 		running = true;
@@ -20,10 +28,23 @@ public class CommunicationThread extends Thread
 		this.start();
 	}
 	
+	/**
+	 * Thread run method
+	 */
 	public void run()
 	{
 		while(running)
 		{
+			// Read for client state changes
+			try
+			{
+				
+			}
+			catch(Exception e)
+			{
+				
+			}
+			// Send wiper status to client
 			try
 			{
 				boolean wipersDetected = NightWiperActivity.getWipersDetected();
@@ -31,14 +52,17 @@ public class CommunicationThread extends Thread
 				String wiperStatusString;
 				//if(wipersDetected)
 				//{
-					wiperStatusString = wiperStatus ? "1" : "0";
+					//wiperStatusString = wiperStatus ? "1" : "0";
+					wiperStatusString = wipersDetected ? "1" : "0";
 				//}
 				//else 
 				//{
 				//	wiperStatusString = "10001";
 				//}
 				
-				String wiperMessage = getTimeString() + "+WIP>" + wiperStatusString;
+				//String wiperMessage = getTimeString() + "+WIP>" + wiperStatusString;
+				
+				String wiperMessage = "+WIP>" + wiperStatusString;
 				Log.i(TAG,"Sending message: " + wiperMessage);
 				mBluetoothServer.writeLine(wiperMessage);
 				Thread.sleep(200);
@@ -54,11 +78,20 @@ public class CommunicationThread extends Thread
 		}
 	}
 	
+	/**
+	 * Stops the communication thread
+	 */
 	public void cancel()
 	{
 		running = false;
+		mBluetoothServer.closeSocket();
+		mBluetoothServer = null;
 	}
 	
+	/**
+	 * Obtains a current time string
+	 * @return Formatted time string
+	 */
 	private static String getTimeString()
 	{
 		String result = "";
@@ -74,4 +107,5 @@ public class CommunicationThread extends Thread
 		}
 		return result;
 	}
+	
 }

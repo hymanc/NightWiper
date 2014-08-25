@@ -23,8 +23,8 @@ import android.app.Activity;
  * @author Cody Hyman
  * @brief A Bluetooth serial-port-protocol (SPP) server class for Android
  */
-public class BluetoothSPPServer{
-	
+public class BluetoothSPPServer
+{
 	private final String NAME = "BluetoothServer";
 	private final String TAG = "BluetoothSPPServer";
 	//private final UUID MY_UUID = UUID.randomUUID();
@@ -36,23 +36,31 @@ public class BluetoothSPPServer{
 	private ConnectThread connectThread;
 	private AcceptThread acceptThread;
 	
-	private Context mContext;
 	private Handler mHandler;
 	
+	public static final int STATE_NO_CLIENT_INIT = 0;
+	public static final int STATE_CLIENT_CONNECTED = 1;
+	public static final int STATE_CLIENT_DISCONNECTED = 2;
+	public static final int STATE_CLIENT_CONNECTION_LOST = 3;
+	public static final int STATE_WAITING_FOR_CONNECTION = 4;
+	
 	private boolean isConnected;
+	
+	private boolean isRunning;
+	
+	private int brokenPipeCount = 0;
 	
 	public static final int REQUEST_ENABLE_BT = 1;
 	
 	/**
 	 * @brief Constructor for Bluetooth serial-port-protocol (SPP) class
-	 * @param context Server context
 	 * @param handler Parent activity message handler
 	 */
-	public BluetoothSPPServer(Context context, Handler handler)
+	public BluetoothSPPServer(Handler handler)
 	{
 		isConnected = false;
+		isRunning = false;
 		
-		mContext = context;
 		mHandler = handler;
 		
 		Log.i(TAG,"Starting Bluetooth SPP Server");
@@ -99,6 +107,7 @@ public class BluetoothSPPServer{
 		connectThread = new ConnectThread(mBluetoothSocket);
 		connectThread.start();
 		isConnected = true;
+		mHandler.obtainMessage(NightWiperActivity.MESSAGE_BT_STATUS, STATE_CLIENT_CONNECTED, -1).sendToTarget();
 	}
 	
 	/**
@@ -107,7 +116,13 @@ public class BluetoothSPPServer{
 	public void closeSocket()
 	{
 		//mBluetoothSocket.close();
-		connectThread.cancel();
+		isRunning = false;
+		Log.i(TAG,"Closing SPP server socket");
+		if(acceptThread != null)
+			acceptThread.cancel();
+		if(connectThread!= null)
+			connectThread.cancel();
+		mHandler.obtainMessage(NightWiperActivity.MESSAGE_BT_STATUS, STATE_CLIENT_DISCONNECTED, -1).sendToTarget();
 	}
 	
 	/**
@@ -159,12 +174,17 @@ public class BluetoothSPPServer{
 	{
 		private final BluetoothServerSocket mServerSocket;
 		
+		private boolean isAcceptRunning;
+		
 		/**
 		 * @brief AcceptThread constructor
 		 */
 		public AcceptThread()
 		{
+			Log.i(TAG, "Starting accept thread");
 			BluetoothServerSocket tmp = null;
+			isConnected = false;
+			//isAcceptRunning = true;
 			try
 			{
 				tmp = mBluetoothAdapter.listenUsingRfcommWithServiceRecord(NAME,MY_UUID);
@@ -181,8 +201,9 @@ public class BluetoothSPPServer{
 		 */
 		public void run()
 		{
+			isAcceptRunning = true;
 			BluetoothSocket socket = null;
-			while(true)
+			while(isAcceptRunning)
 			{
 				try
 				{
@@ -191,6 +212,7 @@ public class BluetoothSPPServer{
 					String connectedName = socket.getRemoteDevice().getName();
 					Log.i(TAG, "Connected to " + connectedName);
 					Toaster.makeToast("Connected to " + connectedName);
+					mHandler.obtainMessage(NightWiperActivity.MESSAGE_BT_STATUS, STATE_CLIENT_CONNECTED, -1).sendToTarget();
 					break;
 				}
 				catch(IOException e)
@@ -220,6 +242,7 @@ public class BluetoothSPPServer{
 		 */
 		public void cancel()
 		{
+			isAcceptRunning = false;
 			try
 			{
 				Log.i(TAG, "Closing server socket");
@@ -273,44 +296,49 @@ public class BluetoothSPPServer{
 		{
 			byte[] buffer = new byte[1024];
 			int bytes;
-			
 			if(mmOutStream != null)
 			{
 				String startMessage = "NightWiper BT Interface";
 				write(startMessage.getBytes());
 			}
-			
 			// Connection loop
-			while(true)
+			while(isRunning)
 			{
-				Log.i(TAG, "ConnectThread");
-				Log.i(TAG,"Writing periodic message");
-				//write("NightWiper ALIVE\r\n".getBytes());
-				
-				//try { Thread.sleep(200);} catch (InterruptedException e1) {}
-				
 				try
 				{
 					bytes = mmInStream.read(buffer);
 					String bufferTxt = BluetoothSPPServer.this.getBufferString(buffer, bytes);
+					if(bufferTxt.contains("CLIENT_CLOSED"))
+					{
+						Log.i(TAG, "CLIENT CLOSED!");
+						restartConnection();
+					}
 					Log.i(TAG,"Received: " + new String(buffer).substring(0,bytes));
 					Message msg = mHandler.obtainMessage(NightWiperActivity.MESSAGE_BT_READ);
 					Bundle bundle = new Bundle();
 					bundle.putString(NightWiperActivity.BT_MESSAGE, bufferTxt);
 					msg.setData(bundle);
 					mHandler.sendMessage(msg);
-					//mHandler.obtainMessage(NightWiperActivity.MESSAGE_BT_READ, bytes, -1, buffer).sendToTarget();
+					mHandler.obtainMessage(NightWiperActivity.MESSAGE_BT_READ, bytes, -1, buffer).sendToTarget();
 					
-					/*try {
-						Thread.sleep(200);
-					} 
-					catch (InterruptedException e) {}*/
 				}
 				catch(IOException e)
 				{
-					Log.e(TAG,"Exception in Bluetooth connect thread: " + e.toString());
+					Log.e(TAG,"Exception in Bluetooth connect thread: " + e.toString() + ":" + e.getMessage());
 				}
 			}
+		}
+		
+		/**
+		 * Restarts the Bluetooth connection process
+		 */
+		private void restartConnection()
+		{
+			Log.i(TAG,"Resetting server");
+			BluetoothSPPServer.this.closeSocket();
+			isRunning = false;
+			acceptThread = new AcceptThread();
+			acceptThread.start();
 		}
 		
 		/**
@@ -321,12 +349,18 @@ public class BluetoothSPPServer{
 		{
 			try
 			{
-				Log.i(TAG,"Writing Bluetooth Message: " + new String(bytes));
+				//Log.i(TAG,"Writing Bluetooth Message: " + new String(bytes));
 				mmOutStream.write(bytes);
 			}
 			catch(IOException e)
 			{
-				Log.e(TAG,"Exception writing Bluetooth message: " + e.toString());
+				brokenPipeCount++;
+				Log.e(TAG,"Exception writing Bluetooth message(" + brokenPipeCount + "): " + e.toString());
+				if(brokenPipeCount > 10)
+				{
+					Log.i(TAG, "Broken pipe count over limit");
+					restartConnection();
+				}
 			}
 		}
 		
@@ -339,6 +373,7 @@ public class BluetoothSPPServer{
 			{
 				Log.i(TAG, "Closing Bluetooth socket");
 				isConnected = false;
+				isRunning = false;
 				mmSocket.close();
 			}
 			catch(IOException e)

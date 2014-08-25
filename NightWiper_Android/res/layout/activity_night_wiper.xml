@@ -9,8 +9,9 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" >
 
-        <LinearLayout
-            android:layout_width="wrap_content"
+        <RelativeLayout
+            android:id="@+id/RelativeLayout1"
+            android:layout_width="120dp"
             android:layout_height="match_parent"
             android:orientation="vertical" >
 
@@ -18,6 +19,8 @@
                 android:id="@+id/FeaturesView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_alignParentLeft="true"
+                android:layout_alignParentTop="true"
                 android:layout_margin="5dp"
                 android:text="Features: 0"
                 android:textColor="#0066CC"
@@ -27,6 +30,8 @@
                 android:id="@+id/ROCView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_alignParentLeft="true"
+                android:layout_below="@+id/FeaturesView"
                 android:layout_margin="5dp"
                 android:text="ROC: 0"
                 android:textColor="#0066CC"
@@ -36,12 +41,36 @@
                 android:id="@+id/wiperStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_alignParentLeft="true"
+                android:layout_below="@+id/ROCView"
                 android:layout_margin="5dp"
                 android:text="Wipers: Off"
                 android:textColor="#0066CC"
                 android:textStyle="bold" />
 
-        </LinearLayout>
+            <TextView
+                android:id="@+id/filterCountView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentLeft="true"
+                android:layout_below="@+id/wiperStatus"
+                android:layout_margin="5dp"
+                android:textColor="#0066CC"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/ConnectionView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignLeft="@+id/filterCountView"
+                android:layout_alignParentBottom="true"
+                android:layout_margin="5dp"
+                android:layout_marginBottom="40dp"
+                android:text="Disconnected"
+                android:textColor="#CC6600"
+                android:textStyle="bold" />
+
+        </RelativeLayout>
 
         <RelativeLayout
             android:id="@+id/RelativeLayout1"
@@ -67,9 +96,7 @@
                 android:visibility="visible"
                 opencv:camera_id="any"
                 opencv:show_fps="true" />
-
         </RelativeLayout>
-
     </LinearLayout>
 
 </FrameLayout>

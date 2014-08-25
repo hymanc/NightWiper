@@ -5,6 +5,9 @@ import java.util.ArrayList;
 import org.opencv.core.*;
 import org.opencv.imgproc.*;
 
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 
 /**
@@ -15,10 +18,17 @@ import android.util.Log;
 public class NightWiperDetector 
 {	
 	private final static String TAG = "NightWiperDetector";
-	private Mat processedImage;
-	private Mat lines;
+	private static Mat processedImage;
+	private static Mat lines;
 	
-	private static final double ROC_THRESHOLD = 8;
+	private static Handler mHandler;
+	
+	public static void setHandler(Handler handler)
+	{
+		mHandler = handler;
+	}
+	
+	private static final double ROC_THRESHOLD = 4;
 	/**
 	 * 
 	 * @param src Source image
@@ -341,7 +351,14 @@ public class NightWiperDetector
 			// Get line angles and compare to previous to check for motion of wipers
 		}
 		double avgRoc = avgRocArray(domAngleHist);	// Compute average rate-of-change for feature angles
-		
+		if(mHandler != null)
+		{
+			Message rocMsg = mHandler.obtainMessage(NightWiperActivity.MESSAGE_ROC);
+			Bundle rocBundle = new Bundle();
+			rocBundle.putDouble(NightWiperActivity.ROC_VALUE, avgRoc);
+			rocMsg.setData(rocBundle);
+			rocMsg.sendToTarget();
+		}
 		// Check for rate-of-change being over threshold
 		if(avgRoc > ROC_THRESHOLD)
 		{

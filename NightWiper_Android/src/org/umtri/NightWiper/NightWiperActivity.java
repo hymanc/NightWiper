@@ -3,13 +3,11 @@ package org.umtri.NightWiper;
 import android.app.Activity;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.os.SystemClock;
 import android.view.Menu;
 import android.view.MenuItem;
-
-
-
 
 import java.util.ArrayList;
 
@@ -31,6 +29,7 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothSocket;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -52,10 +51,16 @@ public class NightWiperActivity extends Activity implements CvCameraViewListener
 	// Message codes
 	public static final int MESSAGE_TOAST	 = 1;
 	public static final int MESSAGE_BT_READ  = 2;
+	public static final int MESSAGE_ROC 	 = 3;
+	public static final int MESSAGE_FEATURES = 4;
+	public static final int MESSAGE_WIPERS_ON_OFF 	= 5;
+	public static final int MESSAGE_FILTER_COUNT 	= 6;
+	public static final int MESSAGE_BT_STATUS		= 7;
 	
 	// Bundle descriptors
 	public static final String BT_MESSAGE 	= "BluetoothMsg";
 	public static final String TOAST		= "Toast";
+	public static final String ROC_VALUE	= "ROCValue";
 	
 	public static final int DEFAULT_VALUE = 10001;
 	
@@ -81,14 +86,19 @@ public class NightWiperActivity extends Activity implements CvCameraViewListener
 	
 	private Mat lastPreproc;
 	
-	private TextView wiperStatusText=null;
+	private TextView wiperStatusText;
+	private TextView wiperROCText;
+	private TextView wiperFeaturesText;
+	private TextView filterCountText;
+	private TextView connectionViewText;
 	
 	private int filterCounter = 0;
 	
-	private static final int FRAME_TIME = 67;
+	private static final int FRAME_TIME = 30;
 	private long tickTime;
+	private static Handler mHandler;
 	
-    private BaseLoaderCallback 	 	mLoaderCallback = new BaseLoaderCallback(this) 
+    private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) 
     { 
     	/**
     	 * 
@@ -112,27 +122,6 @@ public class NightWiperActivity extends Activity implements CvCameraViewListener
         }
     };
 
-    /**
-     * 
-     */
-    private final Handler mHandler = new Handler()
-    {
-    	@Override
-    	public void handleMessage(Message msg)
-    	{
-    		switch(msg.what)
-    		{
-    		case MESSAGE_TOAST:
-    			Toast.makeText(getApplicationContext(), msg.getData().getString(TOAST),Toast.LENGTH_SHORT).show();
-    			break;
-    		case MESSAGE_BT_READ:
-    			Log.i("Bluetooth", "Bluetooth message received, parsing");
-    			String msgData = msg.getData().getString(BT_MESSAGE);
-    			Log.i("Bluetooth", "Message contents: " + msgData);
-    		break;
-    		}
-    	}
-    };
     
     /**
      * Main activity constructor
@@ -152,8 +141,66 @@ public class NightWiperActivity extends Activity implements CvCameraViewListener
         
         setContentView(R.layout.activity_night_wiper);  
         
+        
+        /**
+         * 
+         */
+        mHandler = new Handler(Looper.getMainLooper())
+        {
+        	@Override
+        	public void handleMessage(Message msg)
+        	{
+        		switch(msg.what)
+        		{
+        		case MESSAGE_TOAST:
+        			Toast.makeText(getApplicationContext(), msg.getData().getString(TOAST),Toast.LENGTH_SHORT).show();
+        			break;
+        		case MESSAGE_BT_READ:
+        			Log.i("Bluetooth", "Bluetooth message received, parsing");
+        			String msgStringData = msg.getData().getString(BT_MESSAGE);
+        			Log.i("Bluetooth", "Message contents: " + msgStringData);
+        			break;
+        		case MESSAGE_ROC:
+        			double msgDoubleData = msg.getData().getDouble(ROC_VALUE);
+        			wiperROCText.setText(String.format("ROC: %.1f", msgDoubleData));
+        			break;
+        		case MESSAGE_FEATURES:
+        			wiperFeaturesText.setText(String.format("Features: %d",msg.arg1));
+        			break;
+        		case MESSAGE_FILTER_COUNT:
+        			if(msg.arg1 > 0)
+        				filterCountText.setText(String.format("%d", msg.arg1));
+        			else
+        				filterCountText.setText("");
+        			break;
+        		case MESSAGE_WIPERS_ON_OFF:
+        			if(msg.arg1 == 1)
+        				wiperStatusText.setText("Wipers: ON");
+        			else 
+        				wiperStatusText.setText("Wipers: OFF");
+        			break;
+        		case MESSAGE_BT_STATUS:
+        			Log.i(TAG,"MESSAGE_BT_STATUS");
+        			switch(msg.arg1)
+        			{
+        			case(BluetoothSPPServer.STATE_CLIENT_DISCONNECTED):
+            			Log.d(TAG,"Bluetooth Status (DISCONNECTED)");
+        				connectionViewText.setText("Disconnected");
+        				connectionViewText.setTextColor(Color.rgb(0xCC,0x66,0));
+        				break;
+        			case(BluetoothSPPServer.STATE_CLIENT_CONNECTED):
+        				Log.d(TAG,"Bluetooth Status (CONNECTED)");
+        				connectionViewText.setText("Connected");
+        				connectionViewText.setTextColor(Color.rgb(0, 0x66, 0));
+        				break;
+        			}
+        			break;
+        		}
+        	}
+        };
+        
         Toaster.setToasterHandler(mHandler);
-        mBluetoothServer = new BluetoothSPPServer(this, mHandler);
+        mBluetoothServer = new BluetoothSPPServer(mHandler);
         
         if(mBluetoothServer == null)
         {
@@ -174,7 +221,14 @@ public class NightWiperActivity extends Activity implements CvCameraViewListener
 
         mOpenCvCameraView.setCvCameraViewListener(this);
         
-        wiperStatusText = (TextView) findViewById(R.id.wiperStatus);
+        // Initialize UI components
+        wiperStatusText 	= (TextView) findViewById(R.id.wiperStatus);
+        wiperROCText 		= (TextView) findViewById(R.id.ROCView);
+        wiperFeaturesText 	= (TextView) findViewById(R.id.FeaturesView);
+        filterCountText 	= (TextView) findViewById(R.id.filterCountView);
+        connectionViewText	= (TextView) findViewById(R.id.ConnectionView);
+        
+        NightWiperDetector.setHandler(mHandler);
         
         mCommThread = new CommunicationThread(mBluetoothServer);
         tickTime = SystemClock.currentThreadTimeMillis();
@@ -198,7 +252,7 @@ public class NightWiperActivity extends Activity implements CvCameraViewListener
     public void onResume()
     {
         super.onResume();
-        OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_2_4_3, this, mLoaderCallback);
+        OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_2_4_9, this, mLoaderCallback); //TODO: Check if this works
     }
 
     /**
@@ -209,6 +263,8 @@ public class NightWiperActivity extends Activity implements CvCameraViewListener
         super.onDestroy();
         if (mOpenCvCameraView != null)
             mOpenCvCameraView.disableView();
+       mCommThread.cancel();
+       mCommThread = null;
     }
 
     /**
@@ -300,7 +356,7 @@ public class NightWiperActivity extends Activity implements CvCameraViewListener
     		Imgproc.equalizeHist(procImg, procImg);
     		Imgproc.blur(procImg, procImg, new Size(9,9));
 
-    		Imgproc.adaptiveThreshold(procImg, procImg, 255, Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C, Imgproc.THRESH_BINARY,15,-3.5);
+    		Imgproc.adaptiveThreshold(procImg, procImg, 255, Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C, Imgproc.THRESH_BINARY,15,-4);
     		Imgproc.medianBlur(procImg, procImg, 7);
     		procImg2 = procImg.clone();
     		if(lastPreproc.size().equals(procImg.size()))
@@ -328,7 +384,7 @@ public class NightWiperActivity extends Activity implements CvCameraViewListener
         	//mDetector.process(frame);
     		//outFrame = frame;
     		Log.i("Detector","Found " + lines.cols() + " lines");
-    		    		
+    		mHandler.obtainMessage(MESSAGE_FEATURES, lines.cols(), -1).sendToTarget(); 		
     		Imgproc.pyrUp(procImg, procImg);
     		Imgproc.cvtColor(procImg, procImg, Imgproc.COLOR_GRAY2RGB);
 
@@ -343,23 +399,28 @@ public class NightWiperActivity extends Activity implements CvCameraViewListener
     			Log.i(TAG,"Line popped");
     		}
     		Log.i(TAG,"Processing lines");
+    		boolean oldWiperStatus = wiperStatus;
     		wiperStatus = NightWiperDetector.determineWiperStatus(lineHistory);
     		if(wiperStatus==true)
     		{
     			Log.i(TAG,"Wipers on!");
     			wipersDetected = true;
-    			wiperStatusText.setText("Wipers: On");
-    			filterCounter = 500;
+    			if(!oldWiperStatus)
+    				mHandler.obtainMessage(MESSAGE_WIPERS_ON_OFF, 1, 0).sendToTarget();
+    			//wiperStatusText.setText("Wipers: On");
+    			filterCounter = 32;
     		}
     		else
     		{
     			Log.i(TAG,"No wiper update, waiting");
+    			mHandler.obtainMessage(MESSAGE_FILTER_COUNT, filterCounter, 1).sendToTarget();
     			filterCounter --;
     		}
     		if(filterCounter < 1)
     		{
     			Log.i(TAG,"Wiper timeout");
-    			wiperStatusText.setText("Wipers: Off");
+    			mHandler.obtainMessage(MESSAGE_WIPERS_ON_OFF, 0, 0).sendToTarget();
+    			//wiperStatusText.setText("Wipers: Off");
     			wipersDetected = false;
     		}
     		Log.i(TAG,"Processed");
